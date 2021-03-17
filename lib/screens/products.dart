@@ -4,6 +4,8 @@
 
 import 'package:beamer/beamer.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:mobile_app_to_web/models/cart.dart';
 import 'package:provider/provider.dart';
 
@@ -31,7 +33,10 @@ class ProductsPage extends StatelessWidget {
             child: TextButton.icon(
               style: TextButton.styleFrom(primary: Colors.white),
               onPressed: () {
-                Navigator.pushNamed(context, CartPage.routeName);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => CartPage()),
+                );
               },
               icon: Icon(Icons.shopping_cart),
               label: Text('Cart'),
@@ -63,12 +68,14 @@ class ProductsPage extends StatelessWidget {
           ),
           Expanded(
             child: LayoutBuilder(builder: (context, constraints) {
-              return GridView.builder(
-                itemCount: 100,
-                itemBuilder: (context, index) => ItemTile(index),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: constraints.maxWidth > 700 ? 4 : 1,
-                  childAspectRatio: 5,
+              return Scrollbar(
+                child: GridView.builder(
+                  itemCount: 100,
+                  itemBuilder: (context, index) => ItemTile(index),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: constraints.maxWidth > 700 ? 4 : 1,
+                    childAspectRatio: 5,
+                  ),
                 ),
               );
             }),
@@ -79,7 +86,11 @@ class ProductsPage extends StatelessWidget {
   }
 }
 
-class ItemTile extends StatelessWidget {
+class AddProduct extends Intent {
+  const AddProduct();
+}
+
+class ItemTile extends StatefulWidget {
   final int itemNo;
 
   const ItemTile(
@@ -87,46 +98,75 @@ class ItemTile extends StatelessWidget {
   );
 
   @override
+  _ItemTileState createState() => _ItemTileState();
+}
+
+class _ItemTileState extends State<ItemTile> {
+  @override
   Widget build(BuildContext context) {
     var cartList = Provider.of<Cart>(context);
-    final Color color = Colors.primaries[itemNo % Colors.primaries.length];
+    final Color color =
+        Colors.primaries[widget.itemNo % Colors.primaries.length];
     return Padding(
       padding: const EdgeInsets.all(8.0),
-      child: ListTile(
-        onTap: () => context.updateCurrentLocation(
-          pathBlueprint: '/products/:productId',
-          pathParameters: {'productId': '$itemNo'},
-        ),
-        leading: Container(
-          width: 50,
-          height: 30,
-          child: Placeholder(
-            color: color,
+      child: Shortcuts(
+        shortcuts: <LogicalKeySet, Intent>{
+          LogicalKeySet(LogicalKeyboardKey.alt): const AddProduct(),
+        },
+        child: Actions(
+          actions: <Type, Action<Intent>>{
+            AddProduct: CallbackAction<AddProduct>(
+                onInvoke: (AddProduct intent) => setState(() {
+                      addRemoveProduct(cartList, context);
+                    })),
+          },
+          child: Focus(
+            autofocus: true,
+            child: MouseRegion(
+              cursor: SystemMouseCursors.text,
+              child: ListTile(
+                onTap: () => context.updateCurrentLocation(
+                  pathBlueprint: '/products/:productId',
+                  pathParameters: {'productId': '${widget.itemNo}'},
+                ),
+                leading: Container(
+                  width: 50,
+                  height: 30,
+                  child: Placeholder(
+                    color: color,
+                  ),
+                ),
+                title: Text(
+                  'Product ${widget.itemNo}',
+                  key: Key('text_${widget.itemNo}'),
+                ),
+                trailing: IconButton(
+                  key: Key('icon_${widget.itemNo}'),
+                  icon: cartList.items.contains(widget.itemNo)
+                      ? Icon(Icons.shopping_cart)
+                      : Icon(Icons.shopping_cart_outlined),
+                  onPressed: () {
+                    addRemoveProduct(cartList, context);
+                  },
+                ),
+              ),
+            ),
           ),
         ),
-        title: Text(
-          'Product $itemNo',
-          key: Key('text_$itemNo'),
-        ),
-        trailing: IconButton(
-          key: Key('icon_$itemNo'),
-          icon: cartList.items.contains(itemNo)
-              ? Icon(Icons.shopping_cart)
-              : Icon(Icons.shopping_cart_outlined),
-          onPressed: () {
-            !cartList.items.contains(itemNo)
-                ? cartList.add(itemNo)
-                : cartList.remove(itemNo);
-            Scaffold.of(context).showSnackBar(
-              SnackBar(
-                content: Text(cartList.items.contains(itemNo)
-                    ? 'Added to cart.'
-                    : 'Removed from cart.'),
-                duration: Duration(seconds: 1),
-              ),
-            );
-          },
-        ),
+      ),
+    );
+  }
+
+  void addRemoveProduct(Cart cartList, BuildContext context) {
+    !cartList.items.contains(widget.itemNo)
+        ? cartList.add(widget.itemNo)
+        : cartList.remove(widget.itemNo);
+    Scaffold.of(context).showSnackBar(
+      SnackBar(
+        content: Text(cartList.items.contains(widget.itemNo)
+            ? 'Added to cart.'
+            : 'Removed from cart.'),
+        duration: Duration(seconds: 1),
       ),
     );
   }
